@@ -5,15 +5,31 @@ from abc import ABC, abstractmethod
 
 class Player:
     def __init__(self,x,width,height,speed):
+        self._sprite = player_model_image
+        self._sprite = py.transform.scale(self.sprite,(width,height))
         self._x = x
         self.y = 600
         self.width = width
         self.height = height
         self.speed = speed
-        self.rect = py.Rect(self.x,self.y-self.height,self.width,self.height)
+        self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
     
     def draw(self):
-        py.draw.rect(screen,(101,67,33),self.rect)
+        py.draw.rect(screen,(0,0,0),self.rect)
+        screen.blit(self.sprite,self.rect)
+    
+    def change_size(self,multiplier):
+        self.width *= multiplier
+        self.height *= multiplier
+        self._sprite = py.transform.scale(self.sprite,(self.width,self.height))
+        self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
+    
+    @property
+    def sprite(self):
+        return self._sprite
+    @sprite.setter
+    def sprite(self,new_sprite):
+        self._sprite = py.transform.scale(new_sprite,(self.width,self.height))
 
     @property
     def x(self):
@@ -28,25 +44,29 @@ class Player:
 
 class Block:
     def __init__(self,x,speed,size):
+        self.sprite = box_model_image
+        self.sprite = py.transform.scale(self.sprite,(size,size))
         self.x = x
         self.y = 0
         self.speed = speed
         self.size = size
-        self.rect = py.Rect(self.x,self.y,self.size,self.size)
+        self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
+        self.rect.width, self.rect.height = self.size, self.size
 
     def update(self):
         self.y += self.speed
-        self.rect = py.Rect(self.x,self.y,self.size,self.size)
+        self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
+        self.rect.width,self.rect.height = self.size,self.size
 
     def draw(self):
-        py.draw.rect(screen,(139,60,19),self.rect)
+        py.draw.rect(screen,(0,0,0),self.rect)
+        screen.blit(self.sprite,self.rect)
 
 class PowerUp(Block,ABC): # Inherits Block for it's movement behavior.
-    def __init__(self,x,speed,size,color):
+    def __init__(self,x,speed,size,image):
         super().__init__(x,speed,size)
-        self.color = color
-    def draw(self):
-        py.draw.rect(screen,self.color,self.rect)
+        self.sprite = image
+        self.sprite = py.transform.scale(self.sprite,(size,size))
     @abstractmethod
     def power_up(self,player):
         """Implemented by other classes"""
@@ -62,13 +82,11 @@ class SpeedPowerDown(PowerUp):
 
 class SizePowerUp(PowerUp):
     def power_up(self,player):
-        player.width *= 1.5
-        player.height *= 1.5
+        player.change_size(1.5)
     
 class SizePowerDown(PowerUp):
     def power_up(self,player):
-        player.width /= 1.5
-        player.height /= 1.5
+        player.change_size(2 / 3)
 
 class ScorePowerUp(PowerUp):
     def power_up(self,_):
@@ -84,12 +102,18 @@ py.display.set_caption('Dodge the boxes')
 clock = py.time.Clock()
 FPS = 60
 
+box_model_image = py.image.load('Box.png').convert_alpha()
+
+player_model_image = py.image.load('player.png').convert_alpha()
+dead_player_image = py.image.load('playerdead.png').convert_alpha()
+
 def game(started=False):
     global score
+    global power_image
     player = Player(400,100,50,5)
 
     power_ups = [SpeedPowerUp,SpeedPowerDown,SizePowerUp,SizePowerDown,ScorePowerUp]
-    power_color = {SpeedPowerUp:(135, 206, 235),SpeedPowerDown:(35, 106, 135),SizePowerUp:(76,187,23),SizePowerDown:(0,87,0),ScorePowerUp:(255,215,0)}
+    power_image = {SpeedPowerUp:py.image.load('speedupgrade.png').convert_alpha(),SpeedPowerDown:py.image.load('speeddowngrade.png').convert_alpha(),SizePowerUp:py.image.load('sizeupgrade.png').convert_alpha(),SizePowerDown:py.image.load('sizedowngrade.png').convert_alpha(),ScorePowerUp:py.image.load('pointupgrade.png').convert_alpha()}
 
     active_power_ups = []
 
@@ -147,12 +171,14 @@ def game(started=False):
                 block.update()
                 block.draw()
                 if player.rect.colliderect(block.rect):
+                    player.sprite = dead_player_image
+                    player.draw()
                     game_over = True
 
             power_up_timer += 1
             if power_up_timer >= power_up_delay:
                 next_power = choice(power_ups)
-                active_power_ups.append(next_power(randint(0,600),randint(1,10),50,power_color[next_power]))
+                active_power_ups.append(next_power(randint(0,600),randint(1,10),50,power_image[next_power]))
                 power_up_timer = 0
             
             for power_up in active_power_ups:
@@ -185,8 +211,21 @@ def game(started=False):
                 render_count += 1
         else:
             screen.fill((200,179,162))
+            title = font.render('Dodge The Blocks!',True,(255,255,255),(150,75,0))
+            screen.blit(title,(275,100))
             start_text = font.render('Press any key to start',True,(255,255,255),(150,75,0))
-            screen.blit(start_text,(275,300))
+            screen.blit(start_text,(275,200))
+
+            tutorial = font.render('Press the arrow keys to move. Avoid the boxes!',True,(255,255,255),(150,75,0))
+            tutorial0 = font.render('Touch power ups to use them! The power ups are as following:',True,(255,255,255),(150,75,0))
+            power_up_explanations = ['Speed Increase: Increases the player\'s speed.','Speed Decrease: Decreases the player\'s speed.','Size Increase: Increases the player\'s size.','Size Decrease: Decreases the player\'s size.','Point Increase: Gives the player 5 points.']
+            screen.blit(tutorial,(0,300))
+            screen.blit(tutorial0,(0,325))
+            value = 350
+            for explanation in power_up_explanations:
+                rendered = font.render(explanation,True,(255,255,255),(150,75,0))
+                screen.blit(rendered,(0,value))
+                value += 25
         
         py.display.flip()
 
