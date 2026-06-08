@@ -13,7 +13,8 @@ class Player:
         self.height = height
         self.speed = speed
         self.rect = py.Rect(self.x,self.y-self.height,self.width,self.height)
-    
+        self.ability = Dash()
+
     def draw(self):
         py.draw.rect(screen,(0,0,0),self.rect)
         screen.blit(self._sprite,self.rect)
@@ -23,6 +24,10 @@ class Player:
         self.height *= multiplier
         self._sprite = py.transform.scale(self.sprite,(self.width,self.height))
         self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
+    
+    def use_ability(self):
+        if self.ability is not None:
+            self.ability.use(player=self)
     
     @property
     def sprite(self):
@@ -92,6 +97,59 @@ class ScorePowerUp(PowerUp):
         global score
         score += 5
 
+class TeleportLeftPowerUp(PowerUp):
+    def power_up(self,player):
+        player.ability = TeleportLeft()
+
+class TeleportRightPowerUp(PowerUp):
+    def power_up(self,player):
+        player.ability = TeleportRight()
+
+class DashPowerUp(PowerUp):
+    def power_up(self,player):
+        player.ability = Dash()
+
+class Ability(ABC):
+    @abstractmethod
+    def use(self,player):
+        """Implemented by other classes"""
+        pass
+
+class TeleportLeft(Ability):
+    @staticmethod
+    def use(player: Player):
+        player.x -= 200
+        if player.x < 0:
+            player.x = 0
+    def __str__(self):
+        return 'Teleport Left'
+
+class TeleportRight(Ability):
+    @staticmethod
+    def use(player):
+        player.x += 200
+        if player.x > 0:
+            player.x = 0
+    def __str__(self):
+        return 'Teleport Right'
+
+class Dash(Ability):
+    @staticmethod
+    def use(player):
+        if current_direction == 'left':
+            player.x -= 100
+            if player.x < 0:
+                player.x = 0
+        elif current_direction == 'right':
+            player.x += 100
+            if player.x > 800:
+                player.x = 800
+
+    def __str__(self):
+        return 'Dash'
+    
+
+
 py.init()
 
 WIDTH, HEIGHT = 800,600
@@ -109,10 +167,18 @@ dead_player_image = py.image.load('playerdead.png').convert_alpha()
 def game(started=False):
     global score
     global power_image
+    global current_direction
     player = Player(400,100,50,5)
 
-    power_ups = [SpeedPowerUp,SpeedPowerDown,SizePowerUp,SizePowerDown,ScorePowerUp]
-    power_image = {SpeedPowerUp:py.image.load('speedupgrade.png').convert_alpha(),SpeedPowerDown:py.image.load('speeddowngrade.png').convert_alpha(),SizePowerUp:py.image.load('sizeupgrade.png').convert_alpha(),SizePowerDown:py.image.load('sizedowngrade.png').convert_alpha(),ScorePowerUp:py.image.load('pointupgrade.png').convert_alpha()}
+    power_ups = [SpeedPowerUp,SpeedPowerDown,SizePowerUp,SizePowerDown,ScorePowerUp,TeleportLeftPowerUp,TeleportRightPowerUp,DashPowerUp]
+    power_image = {SpeedPowerUp:py.image.load('speedupgrade.png').convert_alpha(),
+                   SpeedPowerDown:py.image.load('speeddowngrade.png').convert_alpha(),
+                   SizePowerUp:py.image.load('sizeupgrade.png').convert_alpha(),
+                   SizePowerDown:py.image.load('sizedowngrade.png').convert_alpha(),
+                   ScorePowerUp:py.image.load('pointupgrade.png').convert_alpha(),
+                   TeleportLeftPowerUp:py.image.load('teleportLeft.png').convert_alpha(),
+                   TeleportRightPowerUp:py.image.load('teleportright.png').convert_alpha(),
+                   DashPowerUp:py.image.load('dash.png').convert_alpha()}
 
     active_power_ups = []
 
@@ -131,6 +197,7 @@ def game(started=False):
     font = py.font.SysFont(None,36)
 
     running = True
+    current_direction = 'none'
 
     while running:
         clock.tick(FPS)
@@ -146,12 +213,16 @@ def game(started=False):
                     break
                 if not started:
                     started = True
+                if started and event.key == py.K_SPACE:
+                    player.use_ability()
 
         if not game_over and started:
             keys = py.key.get_pressed()
             if keys[py.K_LEFT]:
+                current_direction = 'left'
                 player.x -= player.speed
             if keys[py.K_RIGHT]:
+                current_direction = 'right'
                 player.x += player.speed
 
             spawn_timer += 1
@@ -193,7 +264,10 @@ def game(started=False):
 
             score_text = font.render(f'Score: {score}',True,(255,255,255),(150,75,0))
 
+            ability_text = font.render(f'Current Ability: {player.ability}', True, (255,255,255),(150,75,0))
+
             screen.blit(score_text,(50,50))
+            screen.blit(ability_text,(500,50))
 
         elif game_over and started:
             if render_count == 0:
@@ -216,7 +290,7 @@ def game(started=False):
 
             tutorial = font.render('Press the arrow keys to move. Avoid the boxes!',True,(255,255,255),(150,75,0))
             tutorial0 = font.render('Touch power ups to use them! The power ups are as following:',True,(255,255,255),(150,75,0))
-            power_up_explanations = ['Speed Increase: Increases the player\'s speed.','Speed Decrease: Decreases the player\'s speed.','Size Increase: Increases the player\'s size.','Size Decrease: Decreases the player\'s size.','Point Increase: Gives the player 5 points.']
+            power_up_explanations = ['Speed Increase: Increases the player\'s speed.','Speed Decrease: Decreases the player\'s speed.','Size Increase: Increases the player\'s size.','Size Decrease: Decreases the player\'s size.','Point Increase: Gives the player 5 points.','Teleport Left: Gives you the ability Teleport Left.', 'Teleport Right: Gives you the ability Teleport Right.']
             screen.blit(tutorial,(0,300))
             screen.blit(tutorial0,(0,325))
             value = 350
