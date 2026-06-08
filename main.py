@@ -7,16 +7,16 @@ class Player:
     def __init__(self,x,width,height,speed):
         self._sprite = player_model_image
         self._sprite = py.transform.scale(self.sprite,(width,height))
-        self._x = x
+        self._x = x - width / 2
         self.y = 600
         self.width = width
         self.height = height
         self.speed = speed
-        self.rect = self.sprite.get_rect(topleft=(self.x,self.y))
+        self.rect = py.Rect(self.x,self.y-self.height,self.width,self.height)
     
     def draw(self):
         py.draw.rect(screen,(0,0,0),self.rect)
-        screen.blit(self.sprite,self.rect)
+        screen.blit(self._sprite,self.rect)
     
     def change_size(self,multiplier):
         self.width *= multiplier
@@ -37,9 +37,8 @@ class Player:
     
     @x.setter
     def x(self,x):
-        if type(x) is int:
-            if x > 0 and x <= 800-self.width:
-                self._x = x
+        if x > 0 and x < WIDTH - self.width:
+            self._x = x
         self.rect = py.Rect(self.x,self.y-self.height,self.width,self.height)
 
 class Block:
@@ -147,13 +146,12 @@ def game(started=False):
                     break
                 if not started:
                     started = True
-        
 
         if not game_over and started:
             keys = py.key.get_pressed()
             if keys[py.K_LEFT]:
                 player.x -= player.speed
-            elif keys[py.K_RIGHT]:
+            if keys[py.K_RIGHT]:
                 player.x += player.speed
 
             spawn_timer += 1
